@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>WebSocket historic + monitoring</title>
+        <script src="http://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
+        <script src="http://cdn.jsdelivr.net/chartist.js/latest/chartist.min.js"> </script>
+        <link rel="stylesheet" type="text/css" href="http://cdn.jsdelivr.net/chartist.js/latest/chartist.min.css"/>
+        <style>
+			.taille {
+				height: 300px;
+			}
+        </style>
+    </head>
+    <body>
+        <div class="ct-chart1 taille"></div>
+        <div class="ct-chart2 taille"></div>
+        <div class="ct-chart3 taille"></div>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+				function fireWhenReady() {
+					if (typeof Chartist !== 'undefined' && typeof moment !== 'undefined')
+                        displayCharts();
+					else setTimeout(fireWhenReady, 100);
+				}
+				fireWhenReady();
+			});
+			function displayCharts() {
+                var options = {
+                  axisX: {
+                    type: Chartist.FixedScaleAxis,
+                    divisor: 40,
+                    labelInterpolationFnc: function(value) {
+                      return moment(value*1000).format('HH:mm');
+                    }
+                  },
+                  axisY: {
+                    position: 'right'
+                  },
+                  fullWidth: true,
+                    chartPadding: {
+                        left: 60
+                    }
+                };
+                var chart = [
+                    new Chartist.Line('.ct-chart1', {series: []}, options),
+                    new Chartist.Line('.ct-chart2', {series: []}, options),
+                    new Chartist.Line('.ct-chart3', {series: []}, options)
+                ];
+                
+                var ws = new WebSocket("ws://prisme.mooo.com:8084/", "historic-protocol");
+                var wsm = null;
+                ws.onmessage = function (event) {
+                    //console.log(event.data);
+                    var jsonData = JSON.parse(event.data);
+                    //console.log(jsonData);
+                    var dataKey  = ['pressure', 'bmp280Temp', 'htu21Temp', 'humidity'];
+                    var createData = function(jsonTab, index) {
+                        var ret_data_serie = [];
+                        for(var j = 0; j < jsonTab.length; j++) {
+                            ret_data_serie.push({x: jsonTab[j]['timestamp'], y: jsonTab[j][index]});
+                        }
+                        return ret_data_serie;
+                    };
+                    var data1 = [createData(jsonData, dataKey[1]), createData(jsonData, dataKey[2])];
+                    chart[0].update({series: data1});
+                    var data2 = [createData(jsonData, dataKey[0])];
+                    chart[1].update({series: data2});
+                    var data3 = [createData(jsonData, dataKey[3])];
+                    chart[2].update({series: data3});
+                    ws.close();
+                    
+                    wsm = new WebSocket("ws://prisme.mooo.com:8084/", "monitoring-protocol");
+                    wsm.onmessage = function (event) {
+                        var jsonData = JSON.parse(event.data);
+                        //console.log(jsonData[dataKey[0]] + ' ' + jsonData[dataKey[1]]);
+                        var timestamp = jsonData['timestamp']
+                        data1[0].push({x: timestamp, y: parseFloat(jsonData[dataKey[1]])});
+                        data1[1].push({x: timestamp, y: parseFloat(jsonData[dataKey[2]])});
+                        data2[0].push({x: timestamp, y: parseFloat(jsonData[dataKey[0]])});
+                        data3[0].push({x: timestamp, y: parseFloat(jsonData[dataKey[3]])});
+                        if(data1[0].length > 1800) {
+                            data1[0].shift();
+                            data1[1].shift();
+                            data2[0].shift();
+                            data3[0].shift();
+                        }
+                        chart[0].update({series : data1});
+                        chart[1].update({series : data2});
+                        chart[2].update({series : data3});
+                    };
+                };
+            }
+        </script>
+    </body>
+</html>

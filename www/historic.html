@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+    <head>
+		<meta charset="UTF-8">
+        <title>WebSocket historic</title>
+        <script src="http://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
+        <script src="http://cdn.jsdelivr.net/chartist.js/latest/chartist.min.js"> </script>
+        <link rel="stylesheet" type="text/css" href="http://cdn.jsdelivr.net/chartist.js/latest/chartist.min.css"/>
+        <style>
+			.taille {
+				height: 300px;
+			}
+			
+			/* style the svg rect */
+			.ct-zoom-rect {
+			  fill: rgba(200, 100, 100, 0.3);
+			  stroke: red;
+			}
+        </style>
+        <script src="chartist-plugin-zoom.js"></script>
+    </head>
+    <body>
+        <div class="ct-chart1 taille"></div>
+        <p><a id="reset0" href="#" style="display:none" onclick='return reset(0)'>Reset</a></p>
+        <div class="ct-chart2 taille"></div>
+        <p><a id="reset1" href="#" style="display:none" onclick='return reset(1)'>Reset</a></p>
+        <div class="ct-chart3 taille"></div>
+        <p><a id="reset2" href="#" style="display:none" onclick='return reset(2)'>Reset</a></p>
+        <script>
+			document.addEventListener('DOMContentLoaded', function () {
+				function fireWhenReady() {
+					if (typeof Chartist !== 'undefined' && typeof moment !== 'undefined')
+                        displayCharts();
+					else setTimeout(fireWhenReady, 100);
+				}
+				fireWhenReady();
+			});
+			
+			var charts;
+			var charts_reset;
+			
+			function getChartIndex(chart) {
+				for(var i=0; i<charts.length;i++) {
+					if(charts[i] === chart) {
+						return i;
+					}
+				}
+				return -1;
+			}
+			
+			function onZoom(chart, reset) {
+				var index = getChartIndex(chart);
+				if(index >= 0) {
+					var resetId = 'reset'+index;
+					document.getElementById(resetId).style.display = 'inline';
+					charts_reset[index] = reset;
+				}
+			}
+			
+			function reset(index) {
+				charts_reset[index] && charts_reset[index]();
+				charts_reset[index] = null;
+				var resetId = 'reset'+index;
+				document.getElementById(resetId).style.display = 'none';
+			}
+			
+			function displayCharts() {
+				var onZoomFct;
+				var options = {
+				  axisX: {
+					type: Chartist.AutoScaleAxis,
+					scaleMinSpace: 38,
+					labelInterpolationFnc: function(value) {
+					  return moment(value*1000).format('HH:mm DD/MM');
+					}
+				  },
+				  axisY: { position: 'right' },
+				  fullWidth: true,
+				  chartPadding: { left: 60 },
+				  plugins: [
+					Chartist.plugins.zoom({
+					  onZoom : onZoom
+					})
+				  ]
+				};
+				charts = [
+					new Chartist.Line('.ct-chart1', {series: []}, options),
+					new Chartist.Line('.ct-chart2', {series: []}, options),
+					new Chartist.Line('.ct-chart3', {series: []}, options)
+				];
+				charts_reset = [null, null, null];
+				
+				var ws = new WebSocket("ws://prisme.mooo.com:8084/", "historic-protocol");
+				ws.onmessage = function (event) {
+					//console.log(event.data);
+					var jsonData = JSON.parse(event.data);
+					//console.log(jsonData);
+					var dataKey  = ['pressure', 'bmp280Temp', 'htu21Temp', 'humidity'];
+					var createData = function(jsonTab, index) {
+						var ret_data_serie = [];
+						for(var j = 0; j < jsonTab.length; j++) {
+							ret_data_serie.push({x: jsonTab[j]['timestamp'], y: jsonTab[j][index]});
+						}
+						return ret_data_serie;
+					};
+					//console.log({series: [createData(jsonData, dataKey[1]), createData(jsonData, dataKey[2])]});
+					charts[0].update({series: [createData(jsonData, dataKey[1]), createData(jsonData, dataKey[2])]});
+					//console.log({series: [createData(jsonData, dataKey[0])]});
+					charts[1].update({series: [createData(jsonData, dataKey[0])]});
+					//console.log({series: [createData(jsonData, dataKey[3])]});
+					charts[2].update({series: [createData(jsonData, dataKey[3])]});
+					ws.close();
+				};
+			}
+        </script>
+    </body>
+</html>

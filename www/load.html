@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>WebSocket Cpu monitoring</title>
+        <script src="http://cdnjs.cloudflare.com/ajax/libs/smoothie/1.27.0/smoothie.min.js" integrity="sha256-WP0rFZEaODFnVsovG/LN3TfD4ke0zqyQf+9AG/8aynQ=" crossorigin="anonymous"></script>
+        <style>
+			.taille {
+				height: 300px;
+			}
+        </style>
+    </head>
+    <body>
+        <canvas id="mycanvas" width="1080" height="400"></canvas>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+				function fireWhenReady() {
+					if (typeof SmoothieChart !== 'undefined')
+                    displayCharts();
+					else setTimeout(fireWhenReady, 100);
+				}
+				fireWhenReady();
+			});
+			function displayCharts() {
+                var smoothie = new SmoothieChart({
+                    grid: { strokeStyle: 'rgb(125, 0, 0)', fillStyle: 'rgb(60, 0, 0)', lineWidth: 1, millisPerLine: 60000, verticalSections:20},
+                    labels: { fillStyle:'rgb(60, 0, 0)' },
+                    scaleSmoothing:0.1,
+                    minValue:0,
+                    maxValue:1,
+                    millisPerPixel:1000
+                });
+                smoothie.streamTo(document.getElementById("mycanvas"), 1000);
+                
+                var line1 = new TimeSeries();
+                var line2 = new TimeSeries();
+                var line3 = new TimeSeries();
+                
+                // Add to SmoothieChart
+                smoothie.addTimeSeries(line1, { strokeStyle:'rgb(0,   255,   0)', fillStyle:'rgba(0  , 255,   0, 0.5)', lineWidth:3 });
+                smoothie.addTimeSeries(line2, { strokeStyle:'rgb(255, 255,   0)', fillStyle:'rgba(255, 255,   0, 0.4)', lineWidth:3 });
+                smoothie.addTimeSeries(line3, { strokeStyle:'rgb(255,   0, 255)', fillStyle:'rgba(255,   0, 255, 0.3)', lineWidth:3 });
+                            
+                var wsm = new WebSocket("ws://prisme.mooo.com:8084/", "cpu-protocol");
+                wsm.onmessage = function (event) {
+                    var jsonData = JSON.parse(event.data);
+                    //var time = new Date().getTime()
+                    line1.append(new Date().getTime(), jsonData[0]);
+                    line2.append(new Date().getTime(), jsonData[1]);
+                    line3.append(new Date().getTime(), jsonData[2]);
+                };
+            }
+        </script>
+    </body>
+</html>

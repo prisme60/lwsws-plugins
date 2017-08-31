@@ -1,0 +1,37 @@
+{
+ "vhosts": [ {
+     "name": "test",
+     "port": "8084",
+#     "interface": "lo",
+#     "host-ssl-key":  "/etc/pki/tls/private/libwebsockets.org.key",
+#     "host-ssl-cert": "/etc/pki/tls/certs/libwebsockets.org.crt",
+#     "host-ssl-ca":   "/etc/pki/tls/certs/libwebsockets.org.cer",
+     "access-log": "/var/log/lwsws/test-access-log",
+#     "sts": "on",
+     "mounts": [{
+       "mountpoint": "/",
+       "origin": "file:///home/christian/www/",
+       "default": "monitoring.html",
+       "cache-max-age": "60",
+       "cache-reuse": "1",
+       "cache-revalidate": "1",
+       "cache-intermediaries": "0"
+       }],
+     # which protocols are enabled for this vhost, and optional
+     # vhost-specific config options for the protocol
+     #
+     "ws-protocols": [{
+       "monitoring-protocol": {
+         "status": "ok"
+       },
+       "historic-protocol": {
+         "status": "ok"
+       },
+       "cpu-protocol": {
+         "status": "ok"
+       }
+     }]
+    }
+  ]
+}
+
