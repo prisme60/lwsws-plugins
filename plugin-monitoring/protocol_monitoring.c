@@ -28,6 +28,7 @@
 
 #include <string.h>
 
+
 struct per_vhost_data__monitoring {
 	uv_timer_t timeout_watcher;
 	struct lws_context *context;
@@ -40,6 +41,20 @@ struct per_session_data__monitoring {
 };
 
 /////////////////////////////////////////////////
+#define INTERNAL_BUF_SIZE 50
+
+static char dev76_pressure[]= "/sys/bus/i2c/devices/i2c-1/1-0076/iio:device?/in_pressure_input" ;
+static char dev76_temperature[]= "/sys/bus/i2c/devices/i2c-1/1-0076/iio:device?/in_temp_input" ;
+static char dev40_temperature[]= "/sys/bus/i2c/devices/i2c-1/1-0040/iio:device?/in_temp_input" ;
+static char dev40_humidity[]="/sys/bus/i2c/devices/i2c-1/1-0040/iio:device?/in_humidityrelative_input";
+
+static char *captors[] = {
+dev76_pressure,
+dev76_temperature,
+dev40_temperature,
+dev40_humidity};
+
+#define NB_CAPTORS (sizeof(captors)/sizeof(captors[0]))
 
 static char* getStr(char * path, char out_buf[], int size) {
 	FILE * f = fopen(path, "rt");
@@ -55,11 +70,39 @@ static char* getStr(char * path, char out_buf[], int size) {
 	return out_buf;
 }
 
-#define INTERNAL_BUF_SIZE 50
+
+static void probe_captors()
+{
+	printf("probe_captors() : %d captors\n", NB_CAPTORS);
+	for(int i=0; i < NB_CAPTORS; i++)
+	{
+		char* pindex = strchr(captors[i], '?');
+		if(index!=NULL)
+		{
+			printf("captor index found\n");
+			for(int j=0; j<10;j++)
+			{
+				char buf[INTERNAL_BUF_SIZE];
+				*pindex = '0' + j ;
+				if(getStr(captors[i], buf, INTERNAL_BUF_SIZE)[0] !='\0')
+				{
+					printf("captor %d %s\n", i, captors[i]);
+					break;
+				}
+			}
+		}
+		else
+		{
+			printf("index not found\n");
+		}
+	}
+}
+
 
 // Return the length of written bytes
 static int retrieveDynamicData(char* outputStr, int length) {
 	char buf[4][INTERNAL_BUF_SIZE];
+	
 	return snprintf(outputStr, length,
 		"{\"timestamp\": %ld,\n"
 		"\"pressure\"  : %.2f,\n"
@@ -67,10 +110,10 @@ static int retrieveDynamicData(char* outputStr, int length) {
 		"\"htu21Temp\" : %.3f,\n"
 		"\"humidity\"  : %.2f}\n", 
 		time(NULL),
-		atof(getStr("/sys/bus/i2c/devices/i2c-1/1-0076/iio:device1/in_pressure_input"        , buf[0], INTERNAL_BUF_SIZE)) * 10,
-		atof(getStr("/sys/bus/i2c/devices/i2c-1/1-0076/iio:device1/in_temp_input"            , buf[1], INTERNAL_BUF_SIZE))/1000,
-		atof(getStr("/sys/bus/i2c/devices/i2c-1/1-0040/iio:device0/in_temp_input"            , buf[2], INTERNAL_BUF_SIZE))/1000,
-		atof(getStr("/sys/bus/i2c/devices/i2c-1/1-0040/iio:device0/in_humidityrelative_input", buf[3], INTERNAL_BUF_SIZE))/1000
+		atof(getStr(dev76_pressure, buf[0], INTERNAL_BUF_SIZE)) * 10,
+		atof(getStr(dev76_temperature, buf[1], INTERNAL_BUF_SIZE))/1000,
+		atof(getStr(dev40_temperature, buf[2], INTERNAL_BUF_SIZE))/1000,
+		atof(getStr(dev40_humidity, buf[3], INTERNAL_BUF_SIZE))/1000
 	);
 }
 
@@ -117,7 +160,8 @@ callback_monitoring(struct lws *wsi, enum lws_callback_reasons reason,
 			      &vhd->timeout_watcher);
 		uv_timer_start(&vhd->timeout_watcher,
 			       uv_timeout_cb_monitoring, 1* 1000, 1 * 1000);
-		printf("+++ monitoring-protocol : LWS_CALLBACK_PROTOCOL INIT\n");
+		probe_captors();
+		printf("+++ monitoring-protocol 2 : LWS_CALLBACK_PROTOCOL INIT\n");
 		break;
 
 	case LWS_CALLBACK_PROTOCOL_DESTROY:
